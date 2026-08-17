@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mamas Lebensgeschichte</title>
+  <title>Meine Lebensgeschichte</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f1ea; padding: 20px; text-align: center; color: #333; }
     .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin: 0 auto 20px auto; max-width: 600px; }
@@ -24,7 +24,7 @@
   <button class="btn-emergency" onclick="stopAll()">🛑 Abbrechen</button>
 
   <div class="card">
-    <h1>Mamas Lebensgeschichte</h1>
+    <h1>Meine Lebensgeschichte</h1>
     <div id="status">Bereit für ein Gespräch...</div>
     <button id="talkBtn" class="btn-talk" onclick="toggleListening()">🎤 Aufnahme starten</button>
     <div id="live-preview"></div>
@@ -42,6 +42,7 @@
     let recognition;
     let isListening = false;
     let finalTranscript = "";
+    let pauseTimer = null;
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -59,7 +60,17 @@
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        document.getElementById("live-preview").innerText = finalTranscript + interimTranscript;
+        
+        const currentText = (finalTranscript + interimTranscript).trim();
+        document.getElementById("live-preview").innerText = currentText;
+
+        // 4-Sekunden-Timer bei jedem erkannten Wort zurücksetzen & neu starten
+        clearTimeout(pauseTimer);
+        if (isListening && currentText.length > 0) {
+          pauseTimer = setTimeout(() => {
+            sendeNachricht();
+          }, 4000); // Auto-Absenden nach 4 Sekunden Stille
+        }
       };
 
       recognition.onerror = (e) => console.log("Speech error:", e);
@@ -71,34 +82,43 @@
     }
 
     function toggleListening() {
-      const btn = document.getElementById("talkBtn");
-      
       if (!isListening) {
         window.speechSynthesis.cancel();
         finalTranscript = "";
         document.getElementById("live-preview").innerText = "";
         recognition.start();
         isListening = true;
+        
+        const btn = document.getElementById("talkBtn");
         btn.classList.add("recording");
         btn.innerText = "⏹️ Fertig / Abschicken";
         setStatus("Ich höre zu... Sprich ganz in Ruhe.");
       } else {
-        isListening = false;
-        recognition.stop();
-        btn.classList.remove("recording");
-        btn.innerText = "🎤 Aufnahme starten";
-        
-        setTimeout(() => {
-          const textToSend = finalTranscript.trim();
-          document.getElementById("live-preview").innerText = "";
-          if (textToSend.length > 0) {
-            appendChat("Mutter", textToSend);
-            verarbeiteEingabe(textToSend);
-          } else {
-            setStatus("Keine Sprache erkannt. Bitte nochmal versuchen.");
-          }
-        }, 500);
+        sendeNachricht();
       }
+    }
+
+    function sendeNachricht() {
+      clearTimeout(pauseTimer);
+      if (!isListening) return;
+
+      isListening = false;
+      recognition.stop();
+      
+      const btn = document.getElementById("talkBtn");
+      btn.classList.remove("recording");
+      btn.innerText = "🎤 Aufnahme starten";
+
+      setTimeout(() => {
+        const textToSend = finalTranscript.trim();
+        document.getElementById("live-preview").innerText = "";
+        if (textToSend.length > 0) {
+          appendChat("Mutter", textToSend);
+          verarbeiteEingabe(textToSend);
+        } else {
+          setStatus("Keine Sprache erkannt. Bitte nochmal versuchen.");
+        }
+      }, 400);
     }
 
     function speak(text) {
@@ -138,6 +158,7 @@
     }
 
     function stopAll() {
+      clearTimeout(pauseTimer);
       window.speechSynthesis.cancel();
       if (recognition) {
         isListening = false;
