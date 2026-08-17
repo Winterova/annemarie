@@ -65,6 +65,9 @@
     <h3>Gesprächsverlauf</h3>
     <div id="chat"></div>
   </div>
+  <button onclick="generiereBuchManuskript()" style="background: #1565c0; color: white; width: 90%; font-size: 1.1rem; margin-top: 10px;">
+  📖 Ganzes Buch-Manuskript generieren &amp; herunterladen
+</button>
 
   <script>
     const FUNCTION_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-chat";
@@ -240,6 +243,51 @@
     function setStatus(text) {
       document.getElementById("status").innerText = text;
     }
+    async function generiereBuchManuskript() {
+  const statusElem = document.getElementById("status");
+  const alterStatus = statusElem.innerText;
+  
+  statusElem.innerText = "Erstelle Manuskript... Bitte einen Moment Geduld (kann 10-20 Sek. dauern).";
+
+  try {
+    const EXPORT_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-export";
+    
+    const response = await fetch(EXPORT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ accessKey })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.manuskript) {
+      throw new Error(data.error || "Fehler beim Erstellen des Manuskripts.");
+    }
+
+    // Datei im Browser als Markdown (.md) zum Download anbieten
+    const datum = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([data.manuskript], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Lebensgeschichte_Annemarie_Manuskript_${datum}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    statusElem.innerText = "Manuskript erfolgreich heruntergeladen!";
+
+  } catch (err) {
+    console.error(err);
+    alert("Fehler beim Generieren des Manuskripts: " + err.message);
+    statusElem.innerText = alterStatus;
+  }
+}
   </script>
 </body>
 </html>
