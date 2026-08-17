@@ -121,12 +121,44 @@
       }, 400);
     }
 
-    function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'de-DE';
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
-    }
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  
+  // Laufende Sprachausgaben sofort stoppen
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'de-DE';
+  utterance.rate = 0.92; // Etwas langsamer für bessere Verständlichkeit
+  utterance.pitch = 1.0;
+
+  // Verfügbare Stimmen abrufen
+  const voices = window.speechSynthesis.getVoices();
+
+  // Prioritätenliste für natürlich klingende Stimmen
+  const preferredVoice = voices.find(v => 
+    v.lang.startsWith('de') && (
+      v.name.includes('Google') || 
+      v.name.includes('Natural') || 
+      v.name.includes('Premium') ||
+      v.name.includes('Katja') ||
+      v.name.includes('Marlene')
+    )
+  ) || voices.find(v => v.lang.startsWith('de'));
+
+  if (preferredVoice) {
+    utterance.voice = preferredVoice;
+  }
+
+  window.speechSynthesis.speak(utterance);
+}
+
+// Sicherstellen, dass die Stimmen im Browser geladen sind
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.getVoices();
+  };
+}
 
     async function verarbeiteEingabe(userText) {
       setStatus("Denke nach...");
