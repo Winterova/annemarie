@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mamas Lebensgeschichte</title>
-  <!-- Supabase JS Client einbinden -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f1ea; padding: 20px; text-align: center; color: #333; }
     .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin: 0 auto 20px auto; max-width: 600px; }
@@ -21,15 +19,12 @@
 </head>
 <body>
 
-  <button class="btn-emergency" onclick="triggerEmergency()">🚨 Hilfe / Pause</button>
+  <button class="btn-emergency" onclick="triggerEmergency()">🚨 Pause / Fertig</button>
 
   <div class="card">
     <h1>Mamas Lebensgeschichte</h1>
     <div id="status">Bereit für ein Gespräch...</div>
     <button class="btn-talk" onclick="toggleListening()">🎤 Sprechen / Zuhören</button>
-    <br><br>
-    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handleFoto(event)">
-    <button class="btn-camera" onclick="document.getElementById('cameraInput').click()">📷 Foto zeigen</button>
   </div>
 
   <div class="card">
@@ -38,19 +33,13 @@
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // DEINE SCHLÜSSEL HIER EINTRAGEN
-    // -------------------------------------------------------------
-    const GEMINI_API_KEY = "DEIN_GEMINI_API_KEY"; 
-    const SUPABASE_URL = "https://fgsprsktzudodqepwmrt.supabase.co";
-    const SUPABASE_ANON_KEY = "DEIN_ANON_PUBLIC_KEY_AUS_SCHRITT_1";
-    // -------------------------------------------------------------
+    // DEINE SUPABASE EDGE FUNCTION URL & ANON KEY
+    const FUNCTION_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-chat";
+    const SUPABASE_ANON_KEY = "DEIN_ANON_PUBLIC_KEY_AUS_SUPABASE";
 
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let recognition;
     let isListening = false;
 
-    // Web Speech API Setup
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
@@ -64,7 +53,7 @@
         verarbeiteEingabe(text);
       };
 
-      recognition.onerror = () => setStatus("Fehler beim Zuhören. Bitte noch einmal auf den grünen Button tippen.");
+      recognition.onerror = () => setStatus("Fehler beim Zuhören. Bitte noch einmal tippen.");
       recognition.onend = () => { isListening = false; };
     } else {
       alert("Spracherkennung wird von diesem Browser leider nicht unterstützt.");
@@ -76,7 +65,7 @@
         isListening = false;
         setStatus("Bereit.");
       } else {
-        window.speechSynthesis.cancel(); // Stoppt KI-Stimme, falls sie noch redet
+        window.speechSynthesis.cancel();
         recognition.start();
         isListening = true;
         setStatus("Ich höre dir zu...");
@@ -86,49 +75,42 @@
     function speak(text) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'de-DE';
-      utterance.rate = 0.95; // Etwas langsamer sprechen
+      utterance.rate = 0.95;
       window.speechSynthesis.speak(utterance);
     }
 
     async function verarbeiteEingabe(userText) {
       setStatus("Denke nach...");
 
-      const systemPrompt = `Du bist eine einfühlsame, geduldige Biografin.
-Sprich ruhig, in kurzen Sätzen (max. 2-3 Sätze). Stelle immer nur EINE Frage.
-Deine Gesprächspartnerin spricht Fränkisch. Wenn ein Dialektwort unklar ist, frage sanft nach der Bedeutung und bitten sie, es zu buchstabieren.`;
-
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch(FUNCTION_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              { role: "user", parts: [{ text: systemPrompt + "\n\nAntworte auf diese Aussage der Mutter: " + userText }] }
-            ]
-          })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ userText })
         });
 
         const data = await response.json();
-        const aiText = data.candidates[0].content.parts[0].text;
         
-        appendChat("Biografin", aiText);
-        speak(aiText);
-        setStatus("Bereit.");
-
-        // Fakt in Supabase speichern (Append-Only)
-        await supabaseClient.from('biografie_fakten').insert([
-          { kategorie: 'Gespräch', aussage: userText }
-        ]);
+        if(data.aiText) {
+          appendChat("Biografin", data.aiText);
+          speak(data.aiText);
+          setStatus("Bereit.");
+        } else {
+          setStatus("Fehler bei der Antwort.");
+        }
 
       } catch (err) {
-        setStatus("Verbindungsfehler. Versuche es gleich nochmal.");
+        setStatus("Verbindungsfehler. Bitte nochmal versuchen.");
       }
     }
 
     function triggerEmergency() {
       window.speechSynthesis.cancel();
       if(recognition) recognition.stop();
-      alert("Keine Sorge! Alles wurde sicher gespeichert. Das Gespräch ist pausiert.");
+      alert("Gespräch pausiert. Alles ist sicher gespeichert!");
       setStatus("Pausiert.");
     }
 
