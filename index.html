@@ -13,49 +13,38 @@
     .btn-emergency { background: #555; color: white; position: fixed; top: 15px; right: 15px; padding: 10px 15px; font-size: 0.9rem; z-index: 100; }
     #status { font-size: 1.2rem; font-weight: bold; color: #555; margin-bottom: 15px; }
     #live-preview { font-style: italic; color: #888; margin-top: 10px; min-height: 24px; }
-    #chat { text-align: left; max-height: 350px; overflow-y: auto; padding: 15px; background: #fafafa; border-radius: 12px; border: 1px solid #eee; }
+    #chat { text-align: left; max-height: 350px; overflow-y: auto; padding: 15px; background: #fafafa; border-radius: 12px; border: 1px solid #eee; display: flex; flex-direction: column; }
     .msg-mutter { color: #1565c0; margin-bottom: 10px; }
     .msg-ki { color: #2e7d32; margin-bottom: 10px; }
-    
-    /* Styling für die ausklappbare Hilfe */
     .card-help { text-align: left; background: #fdfdfd; }
     .card-help summary { font-size: 1.1rem; font-weight: bold; cursor: pointer; color: #2e7d32; padding: 5px 0; user-select: none; }
     .help-content { margin-top: 15px; font-size: 0.95rem; line-height: 1.5; border-top: 1px solid #eee; padding-top: 10px; }
     .help-content h4 { margin: 12px 0 5px 0; color: #333; }
     .help-content ul { margin: 0; padding-left: 20px; }
     .help-content li { margin-bottom: 6px; }
-
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
   </style>
 </head>
 <body>
 
-  <button class="btn-emergency" onclick="stopAll()">🛑 Abbrechen</button>
+  <button class="btn-emergency" onclick="stopAll()">🛑 Abbrechen / Pause</button>
 
   <div class="card">
     <h1>Meine Lebensgeschichte</h1>
     <div id="status">Bereit für ein Gespräch...</div>
-    <button id="talkBtn" class="btn-talk" onclick="toggleListening()">🎤 Aufnahme starten</button>
+    <button id="talkBtn" class="btn-talk" onclick="toggleListening()">🎤 Gespräch starten</button>
     <div id="live-preview"></div>
   </div>
 
-  <!-- Ausklappbare Kurzanleitung -->
   <div class="card card-help">
     <details>
       <summary>💡 Kurzanleitung &amp; Tipps anzeigen</summary>
       <div class="help-content">
-        <h4>1. Die Buttons</h4>
+        <h4>1. Richtige Anwendung</h4>
         <ul>
-        <li><strong>Kompakt antworten:</strong> Bleib bei der gestellten Frage: Antworte direkt auf das, was die Biografin dich fragt. Versuche nicht, mit der KI über die Technik oder den Ablauf zu diskutieren (z. B. nicht sagen: „Ich verstehe die Frage nicht, wie meinst du das?“). Sag stattdessen einfach, was dir dazu einfällt, oder antworte kurz mit: „Dazu weiß ich leider nichts mehr.“</li>
-        <li><strong>Fehler korrigieren:</strong> Einfach im nächsten Satz richtigstellen (z.&nbsp;B. <em>„Das war 1955, nicht 1960“</em>).Das System lernt mit: Die KI übernimmt die Korrektur automatisch für die nächsten Fragen und merkt sich die richtige Version.</li>
-        <li><strong>🛑 Abbrechen (oben rechts):</strong> Stoppt Vorlesen und Aufnahme sofort.</li>
-        </ul>
-
-        <h4>2. Richtige Anwendung</h4>
-        <ul>
-          <li><strong>Kompakt antworten:</strong> Antworte direkt auf die Frage. Sprich nicht über die Technik.</li>
-          <li><strong>Fehler korrigieren:</strong> Einfach im nächsten Satz richtigstellen (z.&nbsp;B. <em>„Das war 1955, nicht 1960“</em>).</li>
-          <li><strong>Nebengeräusche:</strong> Fernseher oder Radio nach Möglichkeit ausschalten.</li>
+          <li><strong>Kompakt antworten:</strong> Antworte direkt auf die Frage der Biografin.</li>
+          <li><strong>Fehler korrigieren:</strong> Einfach im nächsten Satz richtigstellen (z. B. <em>„Das war 1954, nicht 1953“</em>). Das System korrigiert die Fakten automatisch.</li>
+          <li><strong>🛑 Abbrechen (oben rechts):</strong> Stoppt Gespräch, Vorlesen und automatische Aufnahme sofort.</li>
         </ul>
       </div>
     </details>
@@ -65,20 +54,22 @@
     <h3>Gesprächsverlauf</h3>
     <div id="chat"></div>
   </div>
+
   <button onclick="generiereBuchManuskript()" style="background: #1565c0; color: white; width: 90%; font-size: 1.1rem; margin-top: 10px;">
-  📖 Ganzes Buch-Manuskript generieren &amp; herunterladen
-</button>
+    📖 Ganzes Buch-Manuskript generieren &amp; herunterladen
+  </button>
 
   <script>
-    const FUNCTION_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-chat";
+    const CHAT_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-chat";
+    const EXPORT_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-export";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnc3Byc2t0enVkb2RxZXB3bXJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODgwMTUsImV4cCI6MjEwMjU2NDAxNX0.SizIDBtId7xkhsjdq6nHi73VMquHpbXerF_BKdQ4q5k";
 
-    // Sicherheitsschlüssel aus der URL auslesen (?key=...)
     const urlParams = new URLSearchParams(window.location.search);
     const accessKey = urlParams.get('key') || "";
 
     let recognition;
     let isListening = false;
+    let autoRestartAllowed = true; // Steuert den automatischen Neustart nach Sprachausgabe
     let finalTranscript = "";
     let pauseTimer = null;
 
@@ -102,38 +93,39 @@
         const currentText = (finalTranscript + interimTranscript).trim();
         document.getElementById("live-preview").innerText = currentText;
 
-        // 4-Sekunden-Timer zurücksetzen & neu starten
+        // Timer auf 6 Sekunden (6000 ms) gesetzt
         clearTimeout(pauseTimer);
         if (isListening && currentText.length > 0) {
-          pauseTimer = setTimeout(() => {
-            sendeNachricht();
-          }, 4000);
+          pauseTimer = setTimeout(() => { sendeNachricht(); }, 6000);
         }
       };
 
       recognition.onerror = (e) => console.log("Speech error:", e);
-      recognition.onend = () => {
-        if (isListening) recognition.start();
-      };
+      recognition.onend = () => { if (isListening) recognition.start(); };
     } else {
-      alert("Spracherkennung wird nicht unterstützt.");
+      alert("Spracherkennung wird von diesem Browser leider nicht unterstützt.");
     }
 
     function toggleListening() {
       if (!isListening) {
-        window.speechSynthesis.cancel();
-        finalTranscript = "";
-        document.getElementById("live-preview").innerText = "";
-        recognition.start();
-        isListening = true;
-        
-        const btn = document.getElementById("talkBtn");
-        btn.classList.add("recording");
-        btn.innerText = "⏹️ Fertig / Abschicken";
-        setStatus("Ich höre zu... Sprich ganz in Ruhe.");
+        autoRestartAllowed = true;
+        startListeningProcess();
       } else {
         sendeNachricht();
       }
+    }
+
+    function startListeningProcess() {
+      window.speechSynthesis.cancel();
+      finalTranscript = "";
+      document.getElementById("live-preview").innerText = "";
+      recognition.start();
+      isListening = true;
+      
+      const btn = document.getElementById("talkBtn");
+      btn.classList.add("recording");
+      btn.innerText = "⏹️ Fertig / Abschicken";
+      setStatus("Ich höre zu... Sprich ganz in Ruhe.");
     }
 
     function sendeNachricht() {
@@ -151,7 +143,7 @@
         const textToSend = finalTranscript.trim();
         document.getElementById("live-preview").innerText = "";
         if (textToSend.length > 0) {
-          appendChat("Mutter", textToSend);
+          prependChat("Mutter", textToSend);
           verarbeiteEingabe(textToSend);
         } else {
           setStatus("Keine Sprache erkannt. Bitte nochmal versuchen.");
@@ -179,14 +171,20 @@
         )
       ) || voices.find(v => v.lang.startsWith('de'));
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      // Nach Beendigung der Antwort automatisch wieder die Aufnahme starten
+      utterance.onend = () => {
+        if (autoRestartAllowed) {
+          setTimeout(() => {
+            startListeningProcess();
+          }, 500);
+        }
+      };
 
       window.speechSynthesis.speak(utterance);
     }
 
-    // Sicherstellen, dass Stimmen im Browser geladen werden
     if ('speechSynthesis' in window) {
       window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
@@ -195,33 +193,31 @@
       setStatus("Denke nach...");
 
       try {
-        const response = await fetch(FUNCTION_URL, {
+        const response = await fetch(CHAT_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           },
-          // Übermittlung von userText und accessKey
           body: JSON.stringify({ userText, accessKey })
         });
 
         const data = await response.json();
 
         if (response.ok && data.aiText) {
-          appendChat("Biografin", data.aiText);
+          prependChat("Biografin", data.aiText);
           speak(data.aiText);
-          setStatus("Bereit für die nächste Antwort.");
+          setStatus("Antworte...");
         } else {
-          console.error("Server-Fehler:", data);
           setStatus("Fehler: " + (data.error || "Zugriff verweigert"));
         }
-
       } catch (err) {
         setStatus("Verbindungsfehler. Bitte erneut versuchen.");
       }
     }
 
     function stopAll() {
+      autoRestartAllowed = false; // Automatischen Zyklus unterbrechen
       clearTimeout(pauseTimer);
       window.speechSynthesis.cancel();
       if (recognition) {
@@ -229,65 +225,63 @@
         recognition.stop();
       }
       document.getElementById("talkBtn").classList.remove("recording");
-      document.getElementById("talkBtn").innerText = "🎤 Aufnahme starten";
+      document.getElementById("talkBtn").innerText = "🎤 Gespräch starten";
       setStatus("Pausiert.");
     }
 
-    function appendChat(sender, text) {
+    // Fügt neue Nachrichten ganz OBERHALB im Chat-Verlauf ein
+    function prependChat(sender, text) {
       const chat = document.getElementById("chat");
       const cssClass = sender === "Mutter" ? "msg-mutter" : "msg-ki";
-      chat.innerHTML += `<div class="${cssClass}"><strong>${sender}:</strong> ${text}</div>`;
-      chat.scrollTop = chat.scrollHeight;
+      
+      const msgDiv = document.createElement("div");
+      msgDiv.className = cssClass;
+      msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+
+      chat.insertBefore(msgDiv, chat.firstChild);
+      chat.scrollTop = 0;
     }
 
     function setStatus(text) {
       document.getElementById("status").innerText = text;
     }
+
     async function generiereBuchManuskript() {
-  const statusElem = document.getElementById("status");
-  const alterStatus = statusElem.innerText;
-  
-  statusElem.innerText = "Erstelle Manuskript... Bitte einen Moment Geduld (kann 10-20 Sek. dauern).";
+      const statusElem = document.getElementById("status");
+      const alterStatus = statusElem.innerText;
+      statusElem.innerText = "Erstelle Manuskript... Bitte einen Moment Geduld (10-20 Sek.).";
 
-  try {
-    const EXPORT_URL = "https://fgsprsktzudodqepwmrt.supabase.co/functions/v1/biografie-export";
-    
-    const response = await fetch(EXPORT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({ accessKey })
-    });
+      try {
+        const response = await fetch(EXPORT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ accessKey })
+        });
 
-    const data = await response.json();
+        const data = await response.json();
+        if (!response.ok || !data.manuskript) throw new Error(data.error || "Fehler beim Export.");
 
-    if (!response.ok || !data.manuskript) {
-      throw new Error(data.error || "Fehler beim Erstellen des Manuskripts.");
+        const datum = new Date().toISOString().slice(0, 10);
+        const blob = new Blob([data.manuskript], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Lebensgeschichte_Annemarie_Manuskript_${datum}.md`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        statusElem.innerText = "Manuskript erfolgreich heruntergeladen!";
+      } catch (err) {
+        alert("Fehler beim Generieren des Manuskripts: " + err.message);
+        statusElem.innerText = alterStatus;
+      }
     }
-
-    // Datei im Browser als Markdown (.md) zum Download anbieten
-    const datum = new Date().toISOString().slice(0, 10);
-    const blob = new Blob([data.manuskript], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Lebensgeschichte_Annemarie_Manuskript_${datum}.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    statusElem.innerText = "Manuskript erfolgreich heruntergeladen!";
-
-  } catch (err) {
-    console.error(err);
-    alert("Fehler beim Generieren des Manuskripts: " + err.message);
-    statusElem.innerText = alterStatus;
-  }
-}
   </script>
 </body>
 </html>
